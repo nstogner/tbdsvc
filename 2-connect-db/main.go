@@ -33,7 +33,7 @@ func main() {
 
 	svc := Service{db: db}
 	if err := http.ListenAndServe(":7070", http.HandlerFunc(svc.ListProducts)); err != nil {
-		log.Fatal(err)
+		log.Fatal(errors.Wrap(err, "listening and serving"))
 	}
 }
 
