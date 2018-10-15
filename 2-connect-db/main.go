@@ -56,6 +56,7 @@ func (s *Service) ListProducts(w http.ResponseWriter, r *http.Request) {
 	// TODO: Talk about issues of using '*'.
 	if err := s.db.Select(&products, "SELECT * FROM products"); err != nil {
 		log.Println(errors.Wrap(err, "selecting products"))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
