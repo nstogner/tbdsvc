@@ -14,7 +14,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/nstogner/tbdsvc/5-configuration/cmd/productsd/internal/handlers"
+	"github.com/nstogner/tbdsvc/6-refactor-main/cmd/productsd/internal/handlers"
 
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
@@ -58,7 +58,8 @@ func (c *config) dbSSLMode() string {
 	return "require"
 }
 
-func main() {
+// configure the server by parsing environment variables and flags.
+func configure() *config {
 	var flags struct {
 		configOnly bool
 	}
@@ -84,49 +85,70 @@ func main() {
 		os.Exit(2)
 	}
 
+	return &cfg
+}
+
+// initialize the server and all dependencies and return a teardown function.
+func initialize(cfg *config) (*http.Server, func()) {
 	// Initialize dependencies.
 	db, err := sqlx.Connect("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&timezone=utc",
 		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Name, cfg.dbSSLMode()))
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "connecting to db"))
 	}
-	defer db.Close()
+	teardown := func() {
+		db.Close()
+	}
 
 	productsHandler := handlers.Products{DB: db}
 
-	server := http.Server{
+	svr := http.Server{
 		Addr:    cfg.HTTP.Address,
 		Handler: http.HandlerFunc(productsHandler.List),
 	}
+	return &svr, teardown
+}
 
+// startup the server and return a blocking shutdown function.
+func startup(svr *http.Server) func() {
 	serverErrors := make(chan error, 1)
 	go func() {
-		serverErrors <- server.ListenAndServe()
+		serverErrors <- svr.ListenAndServe()
 	}()
 
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
 
-	log.Print("startup complete")
+	return func() {
+		select {
+		case err := <-serverErrors:
+			log.Fatal(errors.Wrap(err, "listening and serving"))
+		case <-osSignals:
+			log.Print("caught signal, shutting down")
 
-	select {
-	case err := <-serverErrors:
-		log.Fatal(errors.Wrap(err, "listening and serving"))
-	case <-osSignals:
-		log.Print("caught signal, shutting down")
+			// Give outstanding requests 30 seconds to complete.
+			const timeout = 30 * time.Second
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
 
-		// Give outstanding requests 30 seconds to complete.
-		const timeout = 30 * time.Second
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-
-		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("error: %s", errors.Wrap(err, "shutting down server"))
-			if err := server.Close(); err != nil {
-				log.Printf("error: %s", errors.Wrap(err, "forcing server to close"))
+			if err := svr.Shutdown(ctx); err != nil {
+				log.Printf("error: %s", errors.Wrap(err, "shutting down server"))
+				if err := svr.Close(); err != nil {
+					log.Printf("error: %s", errors.Wrap(err, "forcing server to close"))
+				}
 			}
 		}
 	}
+}
 
-	log.Print("done")
+func main() {
+	cfg := configure()
+	log.Println("configured")
+
+	svr, teardown := initialize(cfg)
+	defer teardown()
+	log.Println("initialized")
+
+	shutdown := startup(svr)
+	defer shutdown()
 }
