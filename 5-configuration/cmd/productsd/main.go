@@ -58,6 +58,35 @@ func (c *config) dbSSLMode() string {
 	return "require"
 }
 
+func configure() *config {
+	var flags struct {
+		configOnly bool
+	}
+	flag.Usage = func() {
+		fmt.Println("This daemon is a service which manages products.\n\nUsage of productsd:\n\nproductsd [flags]\n")
+		flag.CommandLine.SetOutput(os.Stdout)
+		flag.PrintDefaults()
+		fmt.Println("\nConfiguration:\n")
+		envconfig.Usage(name, &config{})
+	}
+	flag.BoolVar(&flags.configOnly, "config-only", false, "only show parsed configuration and exit")
+	flag.Parse()
+
+	var cfg config
+	if err := envconfig.Process(name, &cfg); err != nil {
+		log.Fatal(errors.Wrap(err, "parsing config"))
+	}
+
+	if flags.configOnly {
+		if err := json.NewEncoder(os.Stdout).Encode(cfg); err != nil {
+			log.Fatal(errors.Wrap(err, "encoding config as json"))
+		}
+		os.Exit(2)
+	}
+
+	return &cfg
+}
+
 func main() {
 	cfg := configure()
 
@@ -106,33 +135,4 @@ func main() {
 	}
 
 	log.Print("done")
-}
-
-func configure() *config {
-	var flags struct {
-		configOnly bool
-	}
-	flag.Usage = func() {
-		fmt.Println("This daemon is a service which manages products.\n\nUsage of productsd:\n\nproductsd [flags]\n")
-		flag.CommandLine.SetOutput(os.Stdout)
-		flag.PrintDefaults()
-		fmt.Println("\nConfiguration:\n")
-		envconfig.Usage(name, &config{})
-	}
-	flag.BoolVar(&flags.configOnly, "config-only", false, "only show parsed configuration and exit")
-	flag.Parse()
-
-	var cfg config
-	if err := envconfig.Process(name, &cfg); err != nil {
-		log.Fatal(errors.Wrap(err, "parsing config"))
-	}
-
-	if flags.configOnly {
-		if err := json.NewEncoder(os.Stdout).Encode(cfg); err != nil {
-			log.Fatal(errors.Wrap(err, "encoding config as json"))
-		}
-		os.Exit(2)
-	}
-
-	return &cfg
 }
