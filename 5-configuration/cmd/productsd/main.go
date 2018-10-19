@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -26,7 +28,7 @@ type config struct {
 	//       certain parameters are set.
 	DB struct {
 		User     string `default:"postgres"`
-		Password string `default:"postgres"`
+		Password string `default:"postgres" json:"-"` // Prevent the marshalling of secrets.
 		Host     string `default:"localhost"`
 		Name     string `default:"postgres"`
 
@@ -53,14 +55,11 @@ func (c *config) dbSSLMode() string {
 	if c.DB.DisableTLS {
 		return "disable"
 	}
-	return "required"
+	return "require"
 }
 
 func main() {
-	var cfg config
-	if err := envconfig.Process(name, &cfg); err != nil {
-		log.Fatal(errors.Wrap(err, "parsing config"))
-	}
+	cfg := configure()
 
 	// Initialize dependencies.
 	db, err := sqlx.Connect("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&timezone=utc",
@@ -107,4 +106,33 @@ func main() {
 	}
 
 	log.Print("done")
+}
+
+func configure() *config {
+	var flags struct {
+		configOnly bool
+	}
+	flag.Usage = func() {
+		fmt.Println("This daemon is a service which manages products.\n\nUsage of productsd:\n\nproductsd [flags]\n")
+		flag.CommandLine.SetOutput(os.Stdout)
+		flag.PrintDefaults()
+		fmt.Println("\nConfiguration:\n")
+		envconfig.Usage(name, &config{})
+	}
+	flag.BoolVar(&flags.configOnly, "config-only", false, "only show parsed configuration and exit")
+	flag.Parse()
+
+	var cfg config
+	if err := envconfig.Process(name, &cfg); err != nil {
+		log.Fatal(errors.Wrap(err, "parsing config"))
+	}
+
+	if flags.configOnly {
+		if err := json.NewEncoder(os.Stdout).Encode(cfg); err != nil {
+			log.Fatal(errors.Wrap(err, "encoding config as json"))
+		}
+		os.Exit(2)
+	}
+
+	return &cfg
 }
