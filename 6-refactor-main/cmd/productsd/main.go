@@ -85,6 +85,8 @@ func configure() *config {
 		os.Exit(2)
 	}
 
+	log.Println("configured")
+
 	return &cfg
 }
 
@@ -106,6 +108,9 @@ func initialize(cfg *config) (*http.Server, func()) {
 		Addr:    cfg.HTTP.Address,
 		Handler: http.HandlerFunc(productsHandler.List),
 	}
+
+	log.Println("initialized")
+
 	return &svr, teardown
 }
 
@@ -143,11 +148,9 @@ func startup(svr *http.Server) func() {
 
 func main() {
 	cfg := configure()
-	log.Println("configured")
 
 	svr, teardown := initialize(cfg)
 	defer teardown()
-	log.Println("initialized")
 
 	shutdown := startup(svr)
 	defer shutdown()
