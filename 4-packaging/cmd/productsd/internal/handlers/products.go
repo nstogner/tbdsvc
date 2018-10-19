@@ -22,6 +22,8 @@ func (s *Products) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Don't return an array (return an object with an array).
+	//       Make a named response type.
 	if err := json.NewEncoder(w).Encode(list); err != nil {
 		log.Println(errors.Wrap(err, "encoding response"))
 		return
