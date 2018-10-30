@@ -107,6 +107,7 @@ func initialize(cfg *config) (*http.Server, func()) {
 	svr := http.Server{
 		Addr:    cfg.HTTP.Address,
 		Handler: http.HandlerFunc(productsHandler.List),
+		// TODO: Timeouts in later section?
 	}
 
 	log.Println("initialized")
@@ -124,7 +125,7 @@ func startup(svr *http.Server) func() {
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
 
-	return func() {
+	shutdown := func() {
 		select {
 		case err := <-serverErrors:
 			log.Fatal(errors.Wrap(err, "listening and serving"))
@@ -144,6 +145,8 @@ func startup(svr *http.Server) func() {
 			}
 		}
 	}
+
+	return shutdown
 }
 
 func main() {
@@ -152,6 +155,6 @@ func main() {
 	svr, teardown := initialize(cfg)
 	defer teardown()
 
-	shutdown := startup(svr)
-	defer shutdown()
+	waitAndShutdown := startup(svr)
+	waitAndShutdown()
 }
