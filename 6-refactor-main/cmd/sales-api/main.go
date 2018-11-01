@@ -41,7 +41,7 @@ type config struct {
 	}
 }
 
-func (c *config) validate() error {
+func (c config) validate() error {
 	if !c.DB.DisableTLS {
 		return errors.New("enabling tls for database connection is not yet supported")
 	}
@@ -50,7 +50,7 @@ func (c *config) validate() error {
 }
 
 // dbSSLMode is derived from setting DB.DisableTLS to true/false.
-func (c *config) dbSSLMode() string {
+func (c config) dbSSLMode() string {
 	if c.DB.DisableTLS {
 		return "disable"
 	}
@@ -58,15 +58,15 @@ func (c *config) dbSSLMode() string {
 }
 
 // configure the server by parsing environment variables and flags.
-func configure() *config {
+func configure() config {
 	var flags struct {
 		configOnly bool
 	}
 	flag.Usage = func() {
-		fmt.Println("This daemon is a service which manages products.\n\nUsage of sales-api:\n\nsales-api [flags]\n")
+		fmt.Print("This daemon is a service which manages products.\n\nUsage of sales-api:\n\nsales-api [flags]\n\n")
 		flag.CommandLine.SetOutput(os.Stdout)
 		flag.PrintDefaults()
-		fmt.Println("\nConfiguration:\n")
+		fmt.Print("\nConfiguration:\n\n")
 		envconfig.Usage(name, &config{})
 	}
 	flag.BoolVar(&flags.configOnly, "config-only", false, "only show parsed configuration and exit")
@@ -86,11 +86,11 @@ func configure() *config {
 
 	log.Println("configured")
 
-	return &cfg
+	return cfg
 }
 
 // initialize the server and all dependencies and return a teardown function.
-func initialize(cfg *config) (*http.Server, func()) {
+func initialize(cfg config) (*http.Server, func()) {
 	// Initialize dependencies.
 	db, err := sqlx.Connect("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&timezone=utc",
 		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Name, cfg.dbSSLMode()))
