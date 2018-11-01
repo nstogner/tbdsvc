@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/nstogner/tbdsvc/4-packaging/cmd/productsd/internal/handlers"
-
 	_ "github.com/lib/pq"
+	"github.com/nstogner/tbdsvc/4-packaging/cmd/sales-api/internal/handlers"
 	"github.com/pkg/errors"
 )
 
