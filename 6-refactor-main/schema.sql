@@ -1,1 +1,8 @@
-CREATE TABLE products (id SERIAL PRIMARY KEY, name VARCHAR(255), cost INT, quantity INT);
+CREATE TABLE products (
+	product_id	UUID,
+	name		VARCHAR(255),
+	cost		INT,
+	quantity	INT,
+
+	PRIMARY KEY (product_id)
+);

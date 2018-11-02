@@ -78,7 +78,7 @@ func main() {
 
 // TODO: Mention JSON conventions / consistency and `json` tags in later (API) session.
 type Product struct {
-	ID       int    `db:"id"`
+	ID       string `db:"product_id"`
 	Name     string `db:"name"`
 	Cost     int    `db:"cost"`
 	Quantity int    `db:"quantity"`

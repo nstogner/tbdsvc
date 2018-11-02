@@ -12,7 +12,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/nstogner/tbdsvc/4-packaging/cmd/sales-api/internal/handlers"
+	"github.com/nstogner/tbdsvc/4-packaging/cmd/salesapi/internal/handlers"
 	"github.com/pkg/errors"
 )
 

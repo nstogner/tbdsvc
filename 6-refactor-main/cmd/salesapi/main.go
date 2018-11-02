@@ -15,12 +15,12 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
-	"github.com/nstogner/tbdsvc/6-refactor-main/cmd/sales-api/internal/handlers"
+	"github.com/nstogner/tbdsvc/6-refactor-main/cmd/salesapi/internal/handlers"
 	"github.com/pkg/errors"
 )
 
 // This is the application name.
-const name = "products"
+const name = "salesapi"
 
 type config struct {
 	// NOTE: We don't pass in a connection string b/c our application may assume
@@ -55,6 +55,16 @@ func (c config) dbSSLMode() string {
 		return "disable"
 	}
 	return "require"
+}
+
+func main() {
+	cfg := configure()
+
+	svr, teardown := initialize(cfg)
+	defer teardown()
+
+	waitAndShutdown := startup(svr)
+	waitAndShutdown()
 }
 
 // configure the server by parsing environment variables and flags.
@@ -146,14 +156,4 @@ func startup(svr *http.Server) func() {
 	}
 
 	return shutdown
-}
-
-func main() {
-	cfg := configure()
-
-	svr, teardown := initialize(cfg)
-	defer teardown()
-
-	waitAndShutdown := startup(svr)
-	waitAndShutdown()
 }
