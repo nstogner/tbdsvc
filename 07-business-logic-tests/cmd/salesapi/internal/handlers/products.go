@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/jmoiron/sqlx"
-	"github.com/nstogner/tbdsvc/07-unit-tests/internal/products"
+	"github.com/nstogner/tbdsvc/07-business-logic-tests/internal/products"
 	"github.com/pkg/errors"
 )
 

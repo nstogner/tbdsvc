@@ -11,7 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
-	"github.com/nstogner/tbdsvc/8-unit-tests/internal/products"
+	"github.com/nstogner/tbdsvc/07-business-logic-tests/internal/products"
 	"github.com/pkg/errors"
 )
 

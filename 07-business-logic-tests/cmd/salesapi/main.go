@@ -14,8 +14,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/nstogner/tbdsvc/07-unit-tests/cmd/salesapi/internal/handlers"
-	"github.com/nstogner/tbdsvc/07-unit-tests/internal/products"
+	"github.com/nstogner/tbdsvc/07-business-logic-tests/cmd/salesapi/internal/handlers"
+	"github.com/nstogner/tbdsvc/07-business-logic-tests/internal/products"
 
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
