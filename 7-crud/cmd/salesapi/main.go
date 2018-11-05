@@ -50,14 +50,6 @@ func (c *config) validate() error {
 	return nil
 }
 
-// dbSSLMode is derived from setting DB.DisableTLS to true/false.
-func (c *config) dbSSLMode() string {
-	if c.DB.DisableTLS {
-		return "disable"
-	}
-	return "require"
-}
-
 func main() {
 	cfg := configure()
 
@@ -77,7 +69,7 @@ func configure() *config {
 		fmt.Print("This daemon is a service which manages products.\n\nUsage of salesapi:\n\nsalesapi [flags]\n\n")
 		flag.CommandLine.SetOutput(os.Stdout)
 		flag.PrintDefaults()
-		fmt.Println("\nConfiguration:\n")
+		fmt.Print("\nConfiguration:\n\n")
 		envconfig.Usage(name, &config{})
 	}
 	flag.BoolVar(&flags.configOnly, "config-only", false, "only show parsed configuration and exit")
@@ -103,8 +95,12 @@ func configure() *config {
 // initialize the server and all dependencies and return a teardown function.
 func initialize(cfg *config) (*http.Server, func()) {
 	// Initialize dependencies.
+	sslMode := "require"
+	if cfg.DB.DisableTLS {
+		sslMode = "disable"
+	}
 	db, err := sqlx.Connect("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&timezone=utc",
-		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Name, cfg.dbSSLMode()))
+		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Name, sslMode))
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "connecting to db"))
 	}

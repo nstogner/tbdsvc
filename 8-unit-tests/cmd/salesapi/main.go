@@ -14,8 +14,10 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/nstogner/tbdsvc/8-unit-tests/cmd/salesapi/internal/handlers"
+	"github.com/nstogner/tbdsvc/8-unit-tests/internal/products"
+
 	_ "github.com/lib/pq"
-	"github.com/nstogner/tbdsvc/5-configuration/cmd/salesapi/internal/handlers"
 	"github.com/pkg/errors"
 )
 
@@ -41,7 +43,7 @@ type config struct {
 	}
 }
 
-func (c config) validate() error {
+func (c *config) validate() error {
 	if !c.DB.DisableTLS {
 		return errors.New("enabling tls for database connection is not yet supported")
 	}
@@ -50,11 +52,22 @@ func (c config) validate() error {
 }
 
 func main() {
+	cfg := configure()
+
+	svr, teardown := initialize(cfg)
+	defer teardown()
+
+	waitAndShutdown := startup(svr)
+	waitAndShutdown()
+}
+
+// configure the server by parsing environment variables and flags.
+func configure() *config {
 	var flags struct {
 		configOnly bool
 	}
 	flag.Usage = func() {
-		fmt.Print("This daemon is a service which manages products.\n\nUsage of sales-api:\n\nsales-api [flags]\n\n")
+		fmt.Print("This daemon is a service which manages products.\n\nUsage of salesapi:\n\nsalesapi [flags]\n\n")
 		flag.CommandLine.SetOutput(os.Stdout)
 		flag.PrintDefaults()
 		fmt.Print("\nConfiguration:\n\n")
@@ -75,53 +88,65 @@ func main() {
 		os.Exit(2)
 	}
 
+	log.Println("configured")
+
+	return &cfg
+}
+
+// initialize the server and all dependencies and return a teardown function.
+func initialize(cfg *config) (*http.Server, func()) {
 	// Initialize dependencies.
-	sslMode := "require"
-	if cfg.DB.DisableTLS {
-		sslMode = "disable"
-	}
-	db, err := sqlx.Connect("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&timezone=utc",
-		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Name, sslMode))
+	db, err := sqlx.Connect("postgres", products.DBConn(cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Name, cfg.DB.DisableTLS))
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "connecting to db"))
 	}
-	defer db.Close()
-
-	productsHandler := handlers.Products{DB: db}
-
-	server := http.Server{
-		Addr:    cfg.HTTP.Address,
-		Handler: http.HandlerFunc(productsHandler.List),
+	teardown := func() {
+		db.Close()
 	}
 
+	productsHandler := handlers.NewProducts(db)
+
+	svr := http.Server{
+		Addr:    cfg.HTTP.Address,
+		Handler: productsHandler,
+		// TODO: Timeouts in later section?
+	}
+
+	log.Println("initialized")
+
+	return &svr, teardown
+}
+
+// startup the server and return a blocking shutdown function.
+func startup(svr *http.Server) func() {
 	serverErrors := make(chan error, 1)
 	go func() {
-		serverErrors <- server.ListenAndServe()
+		serverErrors <- svr.ListenAndServe()
 	}()
 
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
 
-	log.Print("startup complete")
+	shutdown := func() {
+		select {
+		case err := <-serverErrors:
+			log.Fatal(errors.Wrap(err, "listening and serving"))
+		case <-osSignals:
+			log.Print("caught signal, shutting down")
 
-	select {
-	case err := <-serverErrors:
-		log.Fatal(errors.Wrap(err, "listening and serving"))
-	case <-osSignals:
-		log.Print("caught signal, shutting down")
+			// Give outstanding requests 30 seconds to complete.
+			const timeout = 30 * time.Second
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
 
-		// Give outstanding requests 30 seconds to complete.
-		const timeout = 30 * time.Second
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-
-		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("error: %s", errors.Wrap(err, "shutting down server"))
-			if err := server.Close(); err != nil {
-				log.Printf("error: %s", errors.Wrap(err, "forcing server to close"))
+			if err := svr.Shutdown(ctx); err != nil {
+				log.Printf("error: %s", errors.Wrap(err, "shutting down server"))
+				if err := svr.Close(); err != nil {
+					log.Printf("error: %s", errors.Wrap(err, "forcing server to close"))
+				}
 			}
 		}
 	}
 
-	log.Print("done")
+	return shutdown
 }

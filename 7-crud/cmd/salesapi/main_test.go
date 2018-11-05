@@ -14,10 +14,7 @@ func TestConfig(t *testing.T) {
 
 		expectedConfig func() *config
 
-		// Derived fields.
-		expectedDBTLSMode string
-
-		expectedValidateErr error
+		expectedValidateErr bool
 	}{
 		{
 			name: "happy",
@@ -39,8 +36,7 @@ func TestConfig(t *testing.T) {
 				c.HTTP.Address = ":9090"
 				return &c
 			},
-			expectedDBTLSMode:   "disable",
-			expectedValidateErr: nil,
+			expectedValidateErr: false,
 		},
 	}
 
@@ -58,8 +54,8 @@ func TestConfig(t *testing.T) {
 				t.Errorf("expected config %+v, got %+v", exp, got)
 			}
 
-			if exp, got := c.expectedValidateErr, c.expectedConfig().validate(); exp != got {
-				t.Errorf("expected validation error %q, got %q", exp, got)
+			if c.expectedValidateErr && c.expectedConfig().validate() == nil {
+				t.Error("expected validation error")
 			}
 		})
 	}
